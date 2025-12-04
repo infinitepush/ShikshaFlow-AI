@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion';
 import { BookOpen, FileQuestion, TrendingUp, Award } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { mockProgressData, mockQuizzes } from '../utils/mockData';
 import { useAuth } from '../context/AuthContext';
 
 const Dashboard = () => {
@@ -11,25 +10,25 @@ const Dashboard = () => {
     {
       icon: BookOpen,
       label: 'Lectures Created',
-      value: '12',
+      value: '0',
       color: 'bg-blue-500',
     },
     {
       icon: FileQuestion,
       label: 'Quizzes Attempted',
-      value: mockQuizzes.length.toString(),
+      value: '0',
       color: 'bg-green-500',
     },
     {
       icon: Award,
       label: 'Average Score',
-      value: `${Math.round((mockQuizzes.reduce((acc, q) => acc + (q.score / q.total) * 100, 0) / mockQuizzes.length))}%`,
+      value: '0%',
       color: 'bg-[#E63946]',
     },
     {
       icon: TrendingUp,
       label: 'Streak Days',
-      value: '7',
+      value: '0',
       color: 'bg-orange-500',
     },
   ];
@@ -95,7 +94,7 @@ const Dashboard = () => {
         >
           <h2 className="text-xl font-bold text-[#1C1C1C] mb-6">Progress Over Time</h2>
           <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={mockProgressData}>
+            <LineChart data={[]}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="month" stroke="#666" />
               <YAxis stroke="#666" />
@@ -126,7 +125,7 @@ const Dashboard = () => {
         >
           <h2 className="text-xl font-bold text-[#1C1C1C] mb-6">Recent Activity</h2>
           <div className="space-y-4">
-            {mockQuizzes.map((quiz) => (
+            {[].map((quiz) => (
               <div
                 key={quiz.id}
                 className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all duration-300"

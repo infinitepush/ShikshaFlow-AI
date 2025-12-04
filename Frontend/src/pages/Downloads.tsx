@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Download, FileText, Video, Calendar, Search } from 'lucide-react';
-import { mockDownloads } from '../utils/mockData';
 
 const Downloads = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('All');
 
-  const filteredDownloads = mockDownloads.filter((item) => {
+  const filteredDownloads = [].filter((item) => {
     const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterType === 'All' || item.type === filterType;
     return matchesSearch && matchesFilter;

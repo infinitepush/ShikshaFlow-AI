@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request, send_from_directory
 from controllers.generate_controller import generate_assets
+from services.ai_service import generate_study_plan, generate_chat_response
 import requests
 from flask_cors import CORS
 
@@ -29,7 +30,36 @@ def summarize():
     except requests.exceptions.RequestException as e:
         return jsonify({"error": f"Error contacting summarizer service: {e}"}), 500
 
+@app.route("/generate-study-plan", methods=['POST'])
+def generate_plan_route():
+    data = request.get_json()
+    subjects = data.get('subjects')
+    difficulty = data.get('difficulty')
+    deadline = data.get('deadline')
+    
+    if not all([subjects, difficulty, deadline]):
+        return jsonify({"error": "Missing required fields: subjects, difficulty, deadline"}), 400
+        
+    plan_json_string = generate_study_plan(subjects, difficulty, deadline)
+    # The service already returns a stringified JSON, so we can return it directly
+    # with the correct content type.
+    return app.response_class(response=plan_json_string, status=200, mimetype='application/json')
+
+@app.route('/chat', methods=['POST'])
+def chat_route():
+    data = request.get_json()
+    history = data.get('history', [])
+    question = data.get('question')
+
+    if not question:
+        return jsonify({"error": "Missing 'question' field"}), 400
+
+    chat_response = generate_chat_response(history, question)
+    return jsonify({"response": chat_response})
+
 @app.route("/generate", methods=["OPTIONS"])
+@app.route("/generate-study-plan", methods=["OPTIONS"])
+@app.route("/chat", methods=["OPTIONS"])
 def handle_options():
     return '', 200
 

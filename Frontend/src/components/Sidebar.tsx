@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { NavLink } from 'react-router-dom';
+import { useLocation, NavLink } from 'react-router-dom';
 import { Home, BookOpen, FileQuestion, Download, MessageSquare, User, LogOut, Brain, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -10,6 +10,7 @@ interface SidebarProps {
 
 const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const { logout, user } = useAuth();
+  const location = useLocation();
 
   const menuItems = [
     { icon: Home, label: 'Home', path: '/dashboard' },
@@ -66,22 +67,23 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
 
           <nav className="flex-1 p-4 overflow-y-auto">
             <div className="space-y-2">
-              {menuItems.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
+              {menuItems.map((item) => {
+                const isActive = location.pathname === item.path;
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
                       isActive
                         ? 'bg-[#E63946] text-white shadow-md'
                         : 'text-gray-700 hover:bg-gray-100'
-                    }`
-                  }
-                >
-                  <item.icon className="w-5 h-5" />
-                  <span className="font-medium">{item.label}</span>
-                </NavLink>
-              ))}
+                    }`}
+                  >
+                    <item.icon className="w-5 h-5" />
+                    <span className="font-medium">{item.label}</span>
+                  </NavLink>
+                );
+              })}
             </div>
           </nav>
 
@@ -89,7 +91,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
             <button
               onClick={handleLogout}
               className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-gray-700 hover:bg-gray-100 transition-all duration-300"
-            >
+>
               <LogOut className="w-5 h-5" />
               <span className="font-medium">Logout</span>
             </button>

@@ -34,19 +34,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (email: string, password: string) => {
+    // TODO: Implement actual login logic
     await new Promise(resolve => setTimeout(resolve, 1000));
-
-    const mockUser = { email, name: email.split('@')[0] };
-    setUser(mockUser);
-    localStorage.setItem('edubuilder_user', JSON.stringify(mockUser));
+    console.log('Login attempt with:', email, password);
   };
 
   const signup = async (name: string, email: string, password: string) => {
+    // TODO: Implement actual signup logic
     await new Promise(resolve => setTimeout(resolve, 1000));
-
-    const mockUser = { email, name };
-    setUser(mockUser);
-    localStorage.setItem('edubuilder_user', JSON.stringify(mockUser));
+    console.log('Signup attempt with:', name, email, password);
   };
 
   const logout = () => {

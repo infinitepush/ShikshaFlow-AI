@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { MessageSquare, Send, Plus } from 'lucide-react';
-import { mockDoubtSessions, mockChatResponses } from '../utils/mockData';
 
 interface Message {
   id: number;
@@ -19,8 +18,8 @@ interface Session {
 }
 
 const DoubtSessions = () => {
-  const [sessions, setSessions] = useState<Session[]>(mockDoubtSessions);
-  const [activeSession, setActiveSession] = useState<Session>(sessions[0]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -29,11 +28,19 @@ const DoubtSessions = () => {
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [activeSession.messages]);
+    if (sessions.length > 0 && !activeSession) {
+      setActiveSession(sessions[0]);
+    }
+  }, [sessions, activeSession]);
+
+  useEffect(() => {
+    if (activeSession) {
+      scrollToBottom();
+    }
+  }, [activeSession?.messages]);
 
   const handleSend = () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || !activeSession) return;
 
     const newMessage: Message = {
       id: activeSession.messages.length + 1,
@@ -58,7 +65,7 @@ const DoubtSessions = () => {
       const mentorResponse: Message = {
         id: updatedMessages.length + 1,
         sender: 'mentor',
-        text: mockChatResponses[Math.floor(Math.random() * mockChatResponses.length)],
+        text: "I'm sorry, I am not able to respond at the moment. Please try again later.",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -91,6 +98,30 @@ const DoubtSessions = () => {
     setSessions([newSession, ...sessions]);
     setActiveSession(newSession);
   };
+
+  if (!activeSession) {
+    return (
+      <div className="max-w-7xl mx-auto h-[calc(100vh-8rem)]">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <h1 className="text-3xl font-bold text-[#1C1C1C] mb-2">Doubt Sessions</h1>
+          <p className="text-gray-600">Get personalized help with your learning</p>
+        </motion.div>
+        <div className="flex items-center justify-center h-[calc(100%-5rem)]">
+          <button
+            onClick={handleNewSession}
+            className="px-6 py-3 bg-[#E63946] text-white rounded-xl hover:bg-[#d32f3b] transition-all duration-300 flex items-center justify-center gap-2 mb-4 font-semibold"
+          >
+            <Plus className="w-5 h-5" />
+            Start a New Session
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto h-[calc(100vh-8rem)]">

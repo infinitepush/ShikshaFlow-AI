@@ -1,7 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, X, Send } from 'lucide-react';
-import { mockChatResponses } from '../utils/mockData';
+import { MessageCircle, X, Send, Brain } from 'lucide-react';
 
 interface Message {
   id: number;
@@ -21,29 +20,67 @@ const ChatbotShikshak = () => {
     },
   ]);
   const [inputText, setInputText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleSend = () => {
-    if (!inputText.trim()) return;
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading]);
+
+  const handleSend = async () => {
+    if (!inputText.trim() || isLoading) return;
 
     const userMessage: Message = {
-      id: messages.length + 1,
+      id: Date.now(),
       text: inputText,
       sender: 'user',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-    setMessages([...messages, userMessage]);
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
     setInputText('');
+    setIsLoading(true);
 
-    setTimeout(() => {
+    try {
+      const response = await fetch('http://localhost:5000/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          history: newMessages.slice(-6, -1), // Send last 5 messages as history (excluding current user msg)
+          question: inputText,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("The AI is taking a break. Please try again in a moment.");
+      }
+
+      const data = await response.json();
+
       const botResponse: Message = {
-        id: messages.length + 2,
-        text: mockChatResponses[Math.floor(Math.random() * mockChatResponses.length)],
+        id: Date.now() + 1,
+        text: data.response,
         sender: 'bot',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, botResponse]);
-    }, 1000);
+
+    } catch (error: any) {
+      const errorResponse: Message = {
+        id: Date.now() + 1,
+        text: error.message || "Sorry, I couldn't connect to my brain.",
+        sender: 'bot',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, errorResponse]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -60,7 +97,7 @@ const ChatbotShikshak = () => {
             <div className="bg-gradient-to-r from-[#E63946] to-[#d32f3b] p-4 rounded-t-2xl flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
-                  <MessageCircle className="w-6 h-6 text-[#E63946]" />
+                  <Brain className="w-6 h-6 text-[#E63946]" />
                 </div>
                 <div>
                   <h3 className="font-bold text-white">Shikshak</h3>
@@ -90,10 +127,10 @@ const ChatbotShikshak = () => {
                         : 'bg-gray-100 text-[#1C1C1C]'
                     }`}
                   >
-                    <p className="text-sm">{message.text}</p>
+                    <p className="text-sm" style={{ whiteSpace: 'pre-wrap' }}>{message.text}</p>
                     <p
                       className={`text-xs mt-1 ${
-                        message.sender === 'user' ? 'text-white opacity-70' : 'text-gray-500'
+                        message.sender === 'user' ? 'text-white opacity-70 text-right' : 'text-gray-500'
                       }`}
                     >
                       {message.timestamp}
@@ -101,6 +138,23 @@ const ChatbotShikshak = () => {
                   </div>
                 </motion.div>
               ))}
+              {isLoading && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex justify-start"
+                >
+                  <div className="max-w-[75%] rounded-2xl px-4 py-2 bg-gray-100 text-[#1C1C1C]">
+                    <motion.div className="flex gap-1.5 items-center">
+                      <span className="text-sm text-gray-500">Shikshak is typing</span>
+                      <motion.div animate={{ y: [0, -2, 0] }} transition={{ duration: 0.8, repeat: Infinity }} className="w-1.5 h-1.5 bg-gray-400 rounded-full" />
+                      <motion.div animate={{ y: [0, -2, 0] }} transition={{ duration: 0.8, repeat: Infinity, delay: 0.1 }} className="w-1.5 h-1.5 bg-gray-400 rounded-full" />
+                      <motion.div animate={{ y: [0, -2, 0] }} transition={{ duration: 0.8, repeat: Infinity, delay: 0.2 }} className="w-1.5 h-1.5 bg-gray-400 rounded-full" />
+                    </motion.div>
+                  </div>
+                </motion.div>
+              )}
+               <div ref={messagesEndRef} />
             </div>
 
             <div className="p-4 border-t border-gray-200">
@@ -110,12 +164,14 @@ const ChatbotShikshak = () => {
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                  placeholder="Ask me anything..."
-                  className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl focus:border-[#E63946] focus:outline-none transition-all duration-300"
+                  placeholder={isLoading ? "Shikshak is thinking..." : "Ask me anything..."}
+                  className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-xl focus:border-[#E63946] focus:outline-none transition-all duration-300 disabled:opacity-70"
+                  disabled={isLoading}
                 />
                 <button
                   onClick={handleSend}
-                  className="px-4 py-2 bg-[#E63946] text-white rounded-xl hover:bg-[#d32f3b] transition-all duration-300 shadow-md hover:shadow-lg"
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-[#E63946] text-white rounded-xl hover:bg-[#d32f3f] transition-all duration-300 shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <Send className="w-5 h-5" />
                 </button>

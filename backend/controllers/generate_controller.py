@@ -85,7 +85,12 @@ def generate_assets():
             voice_paths.append(voice_path)
             # Get duration of each voiceover
             duration = get_media_duration(voice_path)
-            durations.append(duration if duration else 25)
+            # Cap duration at 15 seconds to ensure concise videos
+            if duration:
+                capped_duration = min(duration, 15)
+                durations.append(capped_duration)
+            else:
+                durations.append(10)  # Default to 10 seconds if duration cannot be determined
 
         # Combine voiceovers into a single file
         full_voice_path = "output/voiceover.mp3"
@@ -100,7 +105,7 @@ def generate_assets():
         print(f"Slide images (local): {slide_images_local}")
         print(f"Slide images (cloud): {slide_images_cloud}")
 
-        # 5. Generate video with custom durations
+        # 5. Generate video with custom durations (capped for concise videos)
         print("Creating video with custom durations...")
         video_result = create_video(slide_images_local, full_voice_path, durations=durations)
         

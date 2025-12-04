@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
-import { Upload, FileText, Download, Copy, BookText } from 'lucide-react';
+import { Upload, FileText, Download, Copy, BookText, AlertTriangle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const NotesSummarizer = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -13,6 +14,16 @@ const NotesSummarizer = () => {
   const [activeTab, setActiveTab] = useState('summary');
   const [inputType, setInputType] = useState('pdf'); // 'pdf' or 'text'
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+
+  const clearResults = () => {
+    setSummary([]);
+    setFlashcards([]);
+    setGlossary([]);
+    setConceptMap([]);
+    setError(null);
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -20,10 +31,7 @@ const NotesSummarizer = () => {
       setFile(selectedFile);
       setFileName(selectedFile.name);
       setTextInput('');
-      setSummary([]);
-      setFlashcards([]);
-      setGlossary([]);
-      setConceptMap([]);
+      clearResults();
     }
   };
 
@@ -31,10 +39,7 @@ const NotesSummarizer = () => {
     setTextInput(e.target.value);
     setFile(null);
     setFileName('');
-    setSummary([]);
-    setFlashcards([]);
-    setGlossary([]);
-    setConceptMap([]);
+    clearResults();
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -48,56 +53,66 @@ const NotesSummarizer = () => {
       setFile(droppedFile);
       setFileName(droppedFile.name);
       setTextInput('');
-      setSummary([]);
-      setFlashcards([]);
-      setGlossary([]);
-      setConceptMap([]);
+      clearResults();
     }
   };
 
   const handleSummarize = async () => {
-    if (!file && !textInput) {
-      return;
-    }
+    if (!file && !textInput) return;
 
     setIsProcessing(true);
-    setSummary([]);
-    setFlashcards([]);
-    setGlossary([]);
-    setConceptMap([]);
+    clearResults();
 
-    let response;
     try {
+      let response;
       if (file) {
         const formData = new FormData();
         formData.append('file', file);
-        response = await fetch('http://localhost:5000/summarize', {
-          method: 'POST',
-          body: formData,
-        });
+        response = await fetch('http://localhost:5000/summarize', { method: 'POST', body: formData });
       } else {
         response = await fetch('http://localhost:5000/summarize', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ notes_text: textInput }),
         });
       }
 
       if (!response.ok) {
-        throw new Error('Failed to summarize.');
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || `Request failed with status: ${response.status}`);
       }
 
       const data = await response.json();
-      const result = JSON.parse(data.result.raw_output.replace(/```json\n|```/g, ''));
+      
+      // Defensive parsing logic
+      let result;
+      if (data && data.result && data.result.raw_output) {
+        if (typeof data.result.raw_output === 'string') {
+          // It's a string, so clean and parse it
+          const cleanedString = data.result.raw_output.replace(/```json\n?|```/g, '').trim();
+          result = JSON.parse(cleanedString);
+        } else if (typeof data.result.raw_output === 'object') {
+          // It's already an object
+          result = data.result.raw_output;
+        } else {
+          throw new Error("Invalid response format from summarizer service.");
+        }
+      } else {
+        throw new Error("Unexpected response structure from summarizer service.");
+      }
+
       setSummary(result.summary || []);
       setFlashcards(result.flashcards || []);
       setGlossary(result.glossary || []);
       setConceptMap(result.concept_map || []);
-    } catch (error) {
+
+      if (!result.summary?.length && !result.flashcards?.length && !result.glossary?.length) {
+        setError("The summarizer returned an empty result. Please try different content.");
+      }
+
+    } catch (error: any) {
       console.error('Error summarizing:', error);
-      // Handle error state in UI, e.g., show a notification
+      setError(error.message || 'An unknown error occurred.');
     } finally {
       setIsProcessing(false);
     }
@@ -138,7 +153,7 @@ const NotesSummarizer = () => {
     <div className="max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold text-[#1C1C1C] mb-6">Notes Summarizer</h1>
       
-      <div className="bg-white rounded-2xl shadow-md p-6 mb-8">
+      <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
         <div className="flex border-b border-gray-200 mb-6">
           <button
             className={`py-3 px-6 font-medium flex items-center gap-2 ${inputType === 'pdf' ? 'text-[#E63946] border-b-2 border-[#E63946]' : 'text-gray-500'}`}
@@ -212,137 +227,158 @@ const NotesSummarizer = () => {
         )}
       </div>
       
-      {(summary.length > 0 || flashcards.length > 0 || glossary.length > 0) && (
-        <div className="bg-white rounded-2xl shadow-md p-6">
-          <div className="flex border-b border-gray-200 mb-6">
-            <button
-              className={`py-3 px-6 font-medium ${activeTab === 'summary' ? 'text-[#E63946] border-b-2 border-[#E63946]' : 'text-gray-500'}`}
-              onClick={() => setActiveTab('summary')}
-            >
-              Summary
-            </button>
-            <button
-              className={`py-3 px-6 font-medium ${activeTab === 'flashcards' ? 'text-[#E63946] border-b-2 border-[#E63946]' : 'text-gray-500'}`}
-              onClick={() => setActiveTab('flashcards')}
-            >
-              Flashcards
-            </button>
-            <button
-              className={`py-3 px-6 font-medium ${activeTab === 'glossary' ? 'text-[#E63946] border-b-2 border-[#E63946]' : 'text-gray-500'}`}
-              onClick={() => setActiveTab('glossary')}
-            >
-              Glossary
-            </button>
-            <button
-              className={`py-3 px-6 font-medium ${activeTab === 'concept-map' ? 'text-[#E63946] border-b-2 border-[#E63946]' : 'text-gray-500'}`}
-              onClick={() => setActiveTab('concept-map')}
-            >
-              Concept Map
-            </button>
-          </div>
-          
-          {activeTab === 'summary' && (
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg mb-6 flex items-center gap-3"
+            role="alert"
+          >
+            <AlertTriangle className="w-6 h-6" />
             <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Summary</h3>
-                <button
-                  onClick={downloadSummary}
-                  className="flex items-center gap-2 text-sm text-gray-600 hover:text-[#E63946]"
-                >
-                  <Download className="w-4 h-4" />
-                  Download
-                </button>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <ul className="list-disc pl-5 space-y-2">
-                  {summary.map((point, index) => (
-                    <li key={index} className="text-gray-700">{point}</li>
-                  ))}
-                </ul>
-              </div>
+              <p className="font-bold">An Error Occurred</p>
+              <p>{error}</p>
             </div>
-          )}
-          
-          {activeTab === 'flashcards' && (
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Flashcards</h3>
-                <button
-                  onClick={downloadFlashcards}
-                  className="flex items-center gap-2 text-sm text-gray-600 hover:text-[#E63946]"
-                >
-                  <Download className="w-4 h-4" />
-                  Download
-                </button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {flashcards.map((card, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-semibold text-[#E63946]">Q{index + 1}</h4>
-                      <button
-                        onClick={() => copyToClipboard(`${card.question}\n${card.answer}`)}
-                        className="text-gray-400 hover:text-gray-600"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <p className="font-medium mb-2">{card.question}</p>
-                    <div className="mt-3 pt-3 border-t border-gray-100">
-                      <p className="text-sm text-gray-600">Answer:</p>
-                      <p className="mt-1">{card.answer}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {activeTab === 'glossary' && (
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Glossary</h3>
-                <button
-                  onClick={downloadGlossary}
-                  className="flex items-center gap-2 text-sm text-gray-600 hover:text-[#E63946]"
-                >
-                  <Download className="w-4 h-4" />
-                  Download
-                </button>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-              <ul className="list-disc pl-5 space-y-2">
-                  {glossary.map((item, index) => (
-                    <li key={index} className="text-gray-700"><strong>{item.term}:</strong> {item.definition}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
+          </motion.div>
+        )}
 
-          {activeTab === 'concept-map' && (
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Concept Map</h3>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-              <ul className="list-disc pl-5 space-y-2">
-                  {conceptMap.map((item, index) => (
-                    <li key={index} className="text-gray-700">
-                      <strong>{item.parent}</strong>
-                      <ul className="list-disc pl-5 space-y-2">
-                        {item.children.map((child, i) => (
-                          <li key={i}>{child}</li>
-                        ))}
-                      </ul>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+        {(summary.length > 0 || flashcards.length > 0 || glossary.length > 0) && !error && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl shadow-lg p-6"
+          >
+            <div className="flex border-b border-gray-200 mb-6">
+              <button
+                className={`py-3 px-6 font-medium ${activeTab === 'summary' ? 'text-[#E63946] border-b-2 border-[#E63946]' : 'text-gray-500'}`}
+                onClick={() => setActiveTab('summary')}
+              >
+                Summary
+              </button>
+              <button
+                className={`py-3 px-6 font-medium ${activeTab === 'flashcards' ? 'text-[#E63946] border-b-2 border-[#E63946]' : 'text-gray-500'}`}
+                onClick={() => setActiveTab('flashcards')}
+              >
+                Flashcards
+              </button>
+              <button
+                className={`py-3 px-6 font-medium ${activeTab === 'glossary' ? 'text-[#E63946] border-b-2 border-[#E63946]' : 'text-gray-500'}`}
+                onClick={() => setActiveTab('glossary')}
+              >
+                Glossary
+              </button>
+              <button
+                className={`py-3 px-6 font-medium ${activeTab === 'concept-map' ? 'text-[#E63946] border-b-2 border-[#E63946]' : 'text-gray-500'}`}
+                onClick={() => setActiveTab('concept-map')}
+              >
+                Concept Map
+              </button>
             </div>
-          )}
-        </div>
-      )}
+            
+            {activeTab === 'summary' && (
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold">Summary</h3>
+                  <button
+                    onClick={downloadSummary}
+                    className="flex items-center gap-2 text-sm text-gray-600 hover:text-[#E63946]"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download
+                  </button>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <ul className="list-disc pl-5 space-y-2">
+                    {summary.map((point, index) => (
+                      <li key={index} className="text-gray-700">{point}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+            
+            {activeTab === 'flashcards' && (
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold">Flashcards</h3>
+                  <button
+                    onClick={downloadFlashcards}
+                    className="flex items-center gap-2 text-sm text-gray-600 hover:text-[#E63946]"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {flashcards.map((card, index) => (
+                    <div key={index} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-semibold text-[#E63946]">Q{index + 1}</h4>
+                        <button
+                          onClick={() => copyToClipboard(`${card.question}\n${card.answer}`)}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <p className="font-medium mb-2">{card.question}</p>
+                      <div className="mt-3 pt-3 border-t border-gray-100">
+                        <p className="text-sm text-gray-600">Answer:</p>
+                        <p className="mt-1">{card.answer}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {activeTab === 'glossary' && (
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold">Glossary</h3>
+                  <button
+                    onClick={downloadGlossary}
+                    className="flex items-center gap-2 text-sm text-gray-600 hover:text-[#E63946]"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download
+                  </button>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                <ul className="list-disc pl-5 space-y-2">
+                    {glossary.map((item, index) => (
+                      <li key={index} className="text-gray-700"><strong>{item.term}:</strong> {item.definition}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'concept-map' && (
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold">Concept Map</h3>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4">
+                <ul className="list-disc pl-5 space-y-2">
+                    {conceptMap.map((item, index) => (
+                      <li key={index} className="text-gray-700">
+                        <strong>{item.parent}</strong>
+                        <ul className="list-disc pl-5 space-y-2">
+                          {item.children.map((child, i) => (
+                            <li key={i}>{child}</li>
+                          ))}
+                        </ul>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
