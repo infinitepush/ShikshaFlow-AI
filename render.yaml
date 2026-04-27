@@ -12,6 +12,14 @@ services:
         value: 3.11.11
       - key: GEMINI_API_KEY
         sync: false
+      - key: GEMINI_MODELS
+        value: models/gemini-2.5-flash,models/gemini-2.5-flash-lite,models/gemini-2.0-flash,models/gemini-2.0-flash-lite,models/gemini-pro-latest
+      - key: GENERATE_VIDEO
+        value: "false"
+      - key: MAX_VIDEO_SLIDES
+        value: "4"
+      - key: MAX_SLIDE_SECONDS
+        value: "8"
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY

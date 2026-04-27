@@ -5,6 +5,17 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GENERATE_VIDEO = os.getenv("GENERATE_VIDEO", "false").lower() == "true"
+MAX_VIDEO_SLIDES = int(os.getenv("MAX_VIDEO_SLIDES", "4"))
+MAX_SLIDE_SECONDS = int(os.getenv("MAX_SLIDE_SECONDS", "8"))
+GEMINI_MODELS = [
+    model.strip()
+    for model in os.getenv(
+        "GEMINI_MODELS",
+        "models/gemini-2.5-flash,models/gemini-2.5-flash-lite,models/gemini-2.0-flash,models/gemini-2.0-flash-lite,models/gemini-pro-latest",
+    ).split(",")
+    if model.strip()
+]
 CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME")
 CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY")
 CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET")

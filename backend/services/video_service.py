@@ -22,58 +22,52 @@ def create_video(slide_images, audio_path, durations=None):
             # Cap each duration at 15 seconds to ensure total video stays under 90 seconds
             durations = [min(dur, 15) for dur in durations]
 
-        # Process in chunks for better memory management
-        chunk_size = 5  # Process 5 slides at a time
-        all_clips = []
-        
-        # Create video clips from images in chunks
-        for i in range(0, len(existing_images), chunk_size):
-            chunk_images = existing_images[i:i + chunk_size]
-            chunk_durations = durations[i:i + chunk_size]
-            
-            # Create clips for this chunk
-            chunk_clips = []
-            for img, dur in zip(chunk_images, chunk_durations):
-                clip = ImageClip(img, duration=dur)
-                chunk_clips.append(clip)
-            
-            all_clips.extend(chunk_clips)
-
-        # Concatenate all image clips at once for better performance
-        if len(all_clips) > 1:
-            video = concatenate_videoclips(all_clips, method="compose")
-        else:
-            video = all_clips[0]
-
-        # Load audio
-        audio = AudioFileClip(audio_path)
-
-        # Set audio to video (MoviePy 2.x uses with_audio instead of set_audio)
-        final_video = video.with_audio(audio)
-
-        path = "output/lecture.mp4"
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-
-        # Write video file with optimized settings for shorter videos
-        final_video.write_videofile(
-            path, 
-            codec="libx264", 
-            audio_codec="aac", 
-            fps=10,  # Reduced FPS for smaller file size and faster processing
-            bitrate="1000k",  # Lower bitrate for smaller file size
-            threads=4,  # Use multiple threads for faster encoding
-            preset="ultrafast"  # Use fastest encoding preset
-        )
+        all_clips = [ImageClip(img, duration=dur).resized(width=854) for img, dur in zip(existing_images, durations)]
+        video = None
+        audio = None
+        final_video = None
 
         try:
-            from services.cloud_service import upload_file
-            upload_result = upload_file(path, resource_type="video")
-            if upload_result:
-                return {"cloud_url": upload_result["secure_url"], "local_path": path}
-        except Exception as e:
-            print(f"Cloudinary upload failed: {e}")
+            if len(all_clips) > 1:
+                video = concatenate_videoclips(all_clips, method="chain")
+            else:
+                video = all_clips[0]
 
-        return path
+            audio = AudioFileClip(audio_path)
+            final_video = video.with_audio(audio)
+
+            path = "output/lecture.mp4"
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+
+            final_video.write_videofile(
+                path,
+                codec="libx264",
+                audio_codec="aac",
+                fps=6,
+                bitrate="500k",
+                threads=1,
+                preset="ultrafast",
+                logger=None,
+            )
+
+            try:
+                from services.cloud_service import upload_file
+                upload_result = upload_file(path, resource_type="video")
+                if upload_result:
+                    return {"cloud_url": upload_result["secure_url"], "local_path": path}
+            except Exception as e:
+                print(f"Cloudinary upload failed: {e}")
+
+            return path
+        finally:
+            if final_video:
+                final_video.close()
+            elif video and video not in all_clips:
+                video.close()
+            if audio:
+                audio.close()
+            for clip in all_clips:
+                clip.close()
     except Exception as e:
         import traceback
         print(f"Error creating video: {e}")

@@ -1,4 +1,5 @@
 from flask import request, jsonify
+from config.config import GENERATE_VIDEO, MAX_SLIDE_SECONDS, MAX_VIDEO_SLIDES
 from services.ai_service import AIQuotaError, generate_lecture
 from services.slide_service import generate_slides
 from services.voice_service import generate_voiceover, combine_audio
@@ -70,6 +71,7 @@ def generate_assets():
             
         slides = ai_output["slides"]
         quiz = ai_output["quiz"]
+        video_slides = slides[:MAX_VIDEO_SLIDES]
 
         # 2. Generate slides
         print("Generating slides...")
@@ -80,7 +82,7 @@ def generate_assets():
         print("Generating voiceovers...")
         voice_paths = []
         durations = []
-        for i, s in enumerate(slides):
+        for i, s in enumerate(video_slides):
             slide_script = s["script"]
             voice_path = f"output/voiceover_{i}.mp3"
             generate_voiceover(slide_script, voice_path)
@@ -89,10 +91,10 @@ def generate_assets():
             duration = get_media_duration(voice_path)
             # Cap duration at 15 seconds to ensure concise videos
             if duration:
-                capped_duration = min(duration, 15)
+                capped_duration = min(duration, MAX_SLIDE_SECONDS)
                 durations.append(capped_duration)
             else:
-                durations.append(10)  # Default to 10 seconds if duration cannot be determined
+                durations.append(MAX_SLIDE_SECONDS)
 
         # Combine voiceovers into a single file
         full_voice_path = "output/voiceover.mp3"
@@ -113,17 +115,20 @@ def generate_assets():
         print(f"Slide images (local): {slide_images_local}")
         print(f"Slide images (cloud): {slide_images_cloud}")
 
-        # 5. Generate video with custom durations (capped for concise videos)
-        print("Creating video with custom durations...")
-        video_result = create_video(slide_images_local, full_voice_path, durations=durations)
-        
-        if isinstance(video_result, dict):
-            video_path = video_result["cloud_url"]
-            video_local_path = video_result["local_path"]
+        video_path = None
+        video_local_path = None
+        if GENERATE_VIDEO:
+            print("Creating video with custom durations...")
+            video_result = create_video(slide_images_local[:MAX_VIDEO_SLIDES], full_voice_path, durations=durations)
+
+            if isinstance(video_result, dict):
+                video_path = video_result["cloud_url"]
+                video_local_path = video_result["local_path"]
+            else:
+                video_path = video_result
+                video_local_path = video_result
         else:
-            video_path = video_result
-            video_local_path = video_result
-        print(f"Video path: {video_path}")
+            print("Video generation disabled; returning slides, voiceover, and quiz only.")
 
         # 6. Generate quiz
         print("Generating quiz...")

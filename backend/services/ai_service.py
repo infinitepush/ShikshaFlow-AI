@@ -1,6 +1,6 @@
 import google.generativeai as genai
 from google.api_core.exceptions import ResourceExhausted
-from config.config import GEMINI_API_KEY
+from config.config import GEMINI_API_KEY, GEMINI_MODELS
 import json
 import traceback
 
@@ -33,14 +33,10 @@ def _generate_content(full_prompt, fallback_content):
         print("Gemini not available, returning fallback content")
         return fallback_content
 
-    preferred_models = [
-        'models/gemini-2.5-flash',
-        'models/gemini-pro-latest',
-    ]
     quota_errors = []
     service_errors = []
 
-    for model_name in preferred_models:
+    for model_name in GEMINI_MODELS:
         try:
             model = genai.GenerativeModel(model_name)
             response = model.generate_content(
@@ -68,7 +64,10 @@ def _generate_content(full_prompt, fallback_content):
             print(f"Model {model_name} failed: {str(e)[:160]}...")
 
     if quota_errors:
-        raise AIQuotaError("Gemini quota is exhausted. Please wait for quota reset or use a key/project with available quota.")
+        raise AIQuotaError(
+            "Gemini quota is exhausted for all configured models. "
+            "Please wait for quota reset or update GEMINI_MODELS/GEMINI_API_KEY."
+        )
 
     print(f"Error during content generation: {service_errors}")
     traceback.print_exc()
