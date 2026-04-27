@@ -1,4 +1,4 @@
-# 🎓 ShikshaFLow
+# 🎓 Shiksha Flow AI
 ### AI-Powered Platform to Instantly Create and Animate Educational Materials
 
 
@@ -6,7 +6,7 @@
 
 ## 🧠 Overview  
 
-*EduBuilder AI* revolutionizes how educators, trainers, and content creators design lessons.  
+*Shiksha Flow AI* revolutionizes how educators, trainers, and content creators design lessons.  
 Just type a topic — and within minutes, receive *slides, video, voiceover, quizzes, and interactive animations* ready to teach or present.  
 
 > “From text to teaching assets — in minutes, not hours.”
@@ -152,6 +152,6 @@ Phase Two introduces:
 
 ### 1️⃣ Clone the Repository  
 ```bash
-git clone https://github.com/yourusername/edubuilder-ai.git
-cd edubuilder-ai
+git clone https://github.com/yourusername/shiksha-flow-ai.git
+cd shiksha-flow-ai
 
