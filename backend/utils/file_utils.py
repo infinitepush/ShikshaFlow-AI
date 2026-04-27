@@ -2,7 +2,6 @@ import os
 import shutil
 from pptx import Presentation
 from PIL import Image, ImageDraw, ImageFont
-from io import BytesIO
 
 OUTPUT_DIR = "output/"
 
@@ -32,6 +31,46 @@ def list_output_files():
     ensure_output_dir()
     return os.listdir(OUTPUT_DIR)
 
+def _load_font(size, bold=False):
+    font_candidates = [
+        "arialbd.ttf" if bold else "arial.ttf",
+        "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf",
+    ]
+
+    for font_name in font_candidates:
+        try:
+            return ImageFont.truetype(font_name, size)
+        except OSError:
+            continue
+
+    return ImageFont.load_default()
+
+def _draw_wrapped_text(draw, text, position, font, fill, max_width, line_spacing=12):
+    x, y = position
+    words = text.split()
+    lines = []
+    current_line = ""
+
+    for word in words:
+        test_line = f"{current_line} {word}".strip()
+        bbox = draw.textbbox((0, 0), test_line, font=font)
+        if bbox[2] - bbox[0] <= max_width:
+            current_line = test_line
+        else:
+            if current_line:
+                lines.append(current_line)
+            current_line = word
+
+    if current_line:
+        lines.append(current_line)
+
+    for line in lines:
+        draw.text((x, y), line, fill=fill, font=font)
+        bbox = draw.textbbox((x, y), line, font=font)
+        y += (bbox[3] - bbox[1]) + line_spacing
+
+    return y
+
 def convert_pptx_to_images(pptx_path):
     """
     Converts slides in a PowerPoint file to images.
@@ -41,15 +80,8 @@ def convert_pptx_to_images(pptx_path):
     prs = Presentation(pptx_path)
     slide_images = []
 
-    # Use a better font and size for readability
-    try:
-        # Try to use a better font if available
-        font_title = ImageFont.truetype("arial.ttf", 36)
-        font_content = ImageFont.truetype("arial.ttf", 24)
-    except:
-        # Fallback to default font if specific font is not available
-        font_title = ImageFont.load_default()
-        font_content = ImageFont.load_default()
+    font_title = _load_font(58, bold=True)
+    font_content = _load_font(36)
 
     for i, slide in enumerate(prs.slides):
         img_path = os.path.join(OUTPUT_DIR, f"slide_{i+1}.png")
@@ -60,14 +92,24 @@ def convert_pptx_to_images(pptx_path):
         draw = ImageDraw.Draw(img)
         
         # Try to add some basic text from the slide
-        y_offset = 50
+        margin_x = 86
+        y_offset = 76
+        max_text_width = width - (margin_x * 2)
         
         # Add title if exists
         if slide.shapes.title and hasattr(slide.shapes.title, 'text'):
             title_text = slide.shapes.title.text.strip()
             if title_text:
-                draw.text((50, y_offset), title_text, fill=(0, 0, 0), font=font_title)
-                y_offset += 80  # Increased spacing for title
+                y_offset = _draw_wrapped_text(
+                    draw,
+                    title_text,
+                    (margin_x, y_offset),
+                    font_title,
+                    (18, 24, 38),
+                    max_text_width,
+                    line_spacing=10,
+                )
+                y_offset += 46
         
         # Add content from placeholders
         for shape in slide.shapes:
@@ -79,16 +121,31 @@ def convert_pptx_to_images(pptx_path):
                     text = text_frame.text.strip()  # type: ignore
                     if text and shape != slide.shapes.title:  # Skip title as we already handled it
                         try:
-                            # Draw other text content with better formatting
                             lines = text.split('\n')
                             for line in lines:
                                 if line.strip():
-                                    draw.text((70, y_offset), line, fill=(50, 50, 50), font=font_content)
-                                    y_offset += 40  # Increased spacing for better readability
+                                    clean_line = line.strip().lstrip("-").strip()
+                                    clean_line = f"- {clean_line}"
+                                    y_offset = _draw_wrapped_text(
+                                        draw,
+                                        clean_line,
+                                        (margin_x + 12, y_offset),
+                                        font_content,
+                                        (45, 55, 72),
+                                        max_text_width - 24,
+                                        line_spacing=14,
+                                    )
+                                    y_offset += 20
                         except:
                             # Fallback if there are font issues
-                            draw.text((50, y_offset), text[:100], fill=(0, 0, 0), font=font_content)  # Limit text length
-                            y_offset += 40
+                            y_offset = _draw_wrapped_text(
+                                draw,
+                                text[:220],
+                                (margin_x, y_offset),
+                                font_content,
+                                (45, 55, 72),
+                                max_text_width,
+                            )
         
         img.save(img_path)
         slide_images.append(img_path)
