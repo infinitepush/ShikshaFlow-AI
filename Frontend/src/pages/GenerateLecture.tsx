@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Download, Video, FileText, HelpCircle } from 'lucide-react';
+import { Sparkles, Download, Play, Pause, FileText, HelpCircle, SkipBack, SkipForward } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiUrl } from '../utils/api';
 
@@ -12,6 +12,7 @@ interface GeneratedAssets {
   video_path: string | null;
   video_local_path?: string | null;
   slide_images: string[];
+  slide_durations?: number[];
   quiz: QuizQuestion[];
 }
 
@@ -31,6 +32,107 @@ const mediaSrc = (path: string | null | undefined) => {
   return apiUrl(`/media/${filenameFromPath(path)}`);
 };
 
+const LecturePlayer = ({ assets }: { assets: GeneratedAssets }) => {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  const slideStarts = useMemo(() => {
+    let elapsed = 0;
+    return assets.slide_images.map((_, index) => {
+      const start = elapsed;
+      elapsed += assets.slide_durations?.[index] || 8;
+      return start;
+    });
+  }, [assets.slide_durations, assets.slide_images]);
+
+  const goToSlide = (index: number) => {
+    const nextIndex = Math.max(0, Math.min(index, assets.slide_images.length - 1));
+    setCurrentSlide(nextIndex);
+    if (audioRef.current) {
+      audioRef.current.currentTime = slideStarts[nextIndex] || 0;
+    }
+  };
+
+  const togglePlayback = async () => {
+    if (!audioRef.current) return;
+
+    if (audioRef.current.paused) {
+      await audioRef.current.play();
+      setPlaying(true);
+    } else {
+      audioRef.current.pause();
+      setPlaying(false);
+    }
+  };
+
+  useEffect(() => {
+    const nextSlide = slideStarts.findIndex((start, index) => {
+      const nextStart = slideStarts[index + 1] ?? Number.POSITIVE_INFINITY;
+      return currentTime >= start && currentTime < nextStart;
+    });
+
+    if (nextSlide >= 0 && nextSlide !== currentSlide) {
+      setCurrentSlide(nextSlide);
+    }
+  }, [currentSlide, currentTime, slideStarts]);
+
+  return (
+    <div className="bg-white rounded-2xl p-6 shadow-lg">
+      <div className="flex items-center gap-3 mb-4">
+        <Play className="w-6 h-6 text-[#E63946]" />
+        <h3 className="text-xl font-bold text-[#1C1C1C]">Lecture Player</h3>
+      </div>
+
+      <div className="overflow-hidden rounded-xl bg-gray-950">
+        <img
+          src={mediaSrc(assets.slide_images[currentSlide])}
+          alt={`Slide ${currentSlide + 1}`}
+          className="aspect-video w-full object-contain"
+        />
+      </div>
+
+      <audio
+        ref={audioRef}
+        src={mediaSrc(assets.voice_url || assets.voice_path)}
+        onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => setPlaying(false)}
+        className="mt-4 w-full"
+        controls
+      />
+
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <button
+          onClick={() => goToSlide(currentSlide - 1)}
+          className="rounded-xl border border-gray-200 p-3 text-gray-700 hover:bg-gray-50"
+        >
+          <SkipBack className="h-5 w-5" />
+        </button>
+        <button
+          onClick={togglePlayback}
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#E63946] px-4 py-3 font-semibold text-white hover:bg-[#d32f3b]"
+        >
+          {playing ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+          {playing ? 'Pause' : 'Play'}
+        </button>
+        <button
+          onClick={() => goToSlide(currentSlide + 1)}
+          className="rounded-xl border border-gray-200 p-3 text-gray-700 hover:bg-gray-50"
+        >
+          <SkipForward className="h-5 w-5" />
+        </button>
+      </div>
+
+      <p className="mt-3 text-center text-sm text-gray-500">
+        Slide {currentSlide + 1} of {assets.slide_images.length}
+      </p>
+    </div>
+  );
+};
+
 const GenerateLecture = () => {
   const [topic, setTopic] = useState('');
   const [audience, setAudience] = useState('High School');
@@ -41,6 +143,8 @@ const GenerateLecture = () => {
   const [progress, setProgress] = useState(0);
   const [generatedAssets, setGeneratedAssets] = useState<GeneratedAssets | null>(null);
   const [error, setError] = useState('');
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
+  const [showQuizResults, setShowQuizResults] = useState(false);
   const { user, token } = useAuth();
 
   const handleGenerate = async () => {
@@ -49,6 +153,8 @@ const GenerateLecture = () => {
     setProgress(0);
     setGeneratedAssets(null);
     setError('');
+    setSelectedAnswers({});
+    setShowQuizResults(false);
 
     const progressTimer = window.setInterval(() => {
       setProgress(current => Math.min(current + 8, 90));
@@ -287,29 +393,8 @@ const GenerateLecture = () => {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.2 }}
-                className="bg-white rounded-2xl p-6 shadow-lg"
               >
-                <div className="flex items-center gap-3 mb-4">
-                  <Video className="w-6 h-6 text-[#E63946]" />
-                  <h3 className="text-xl font-bold text-[#1C1C1C]">Video</h3>
-                </div>
-                <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg mb-4 flex items-center justify-center">
-                  {generatedAssets.video_path ? (
-                    <video controls src={mediaSrc(generatedAssets.video_path)} className="w-full h-full rounded-lg"></video>
-                  ) : (
-                    <p className="px-4 text-center text-sm text-white">
-                      Video generation did not return a playable file. Slides are still available.
-                    </p>
-                  )}
-                </div>
-                <button
-                  onClick={() => window.open(mediaSrc(generatedAssets.video_path), '_blank')}
-                  disabled={!generatedAssets.video_path}
-                  className="w-full py-2 bg-[#E63946] text-white rounded-xl hover:bg-[#d32f3b] transition-all duration-300 flex items-center justify-center gap-2"
-                >
-                  <Download className="w-4 h-4" />
-                  Download Video (.MP4)
-                </button>
+                <LecturePlayer assets={generatedAssets} />
               </motion.div>
             </div>
 
@@ -333,21 +418,49 @@ const GenerateLecture = () => {
                       </p>
                       <div className="grid gap-2 md:grid-cols-2">
                         {question.options.map((option, optionIndex) => (
-                          <div
+                          <button
                             key={optionIndex}
-                            className={`rounded-lg px-3 py-2 text-sm ${
-                              optionIndex === question.correct
-                                ? 'border border-green-200 bg-green-50 text-green-800'
-                                : 'border border-gray-200 bg-white text-gray-700'
+                            type="button"
+                            disabled={showQuizResults}
+                            onClick={() =>
+                              setSelectedAnswers((answers) => ({
+                                ...answers,
+                                [questionIndex]: optionIndex,
+                              }))
+                            }
+                            className={`rounded-lg border px-3 py-2 text-left text-sm transition-all ${
+                              showQuizResults && optionIndex === question.correct
+                                ? 'border-green-300 bg-green-50 text-green-800'
+                                : showQuizResults && selectedAnswers[questionIndex] === optionIndex
+                                  ? 'border-red-300 bg-red-50 text-red-800'
+                                  : selectedAnswers[questionIndex] === optionIndex
+                                    ? 'border-[#E63946] bg-red-50 text-[#1C1C1C]'
+                                    : 'border-gray-200 bg-white text-gray-700 hover:border-[#E63946]'
                             }`}
                           >
                             {option}
-                          </div>
+                          </button>
                         ))}
                       </div>
+                      {showQuizResults && (
+                        <p className="mt-3 text-sm font-medium text-gray-700">
+                          {selectedAnswers[questionIndex] === question.correct
+                            ? 'Correct'
+                            : `Correct answer: ${question.options[question.correct]}`}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowQuizResults(true)}
+                  disabled={Object.keys(selectedAnswers).length < generatedAssets.quiz.length}
+                  className="mt-5 w-full rounded-xl bg-[#E63946] px-4 py-3 font-semibold text-white transition-all hover:bg-[#d32f3b] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Check Answers
+                </button>
               </motion.div>
             )}
 
@@ -356,6 +469,8 @@ const GenerateLecture = () => {
               onClick={() => {
                 setGenerated(false);
                 setTopic('');
+                setSelectedAnswers({});
+                setShowQuizResults(false);
               }}
               className="w-full py-3 bg-gray-200 text-[#1C1C1C] rounded-xl hover:bg-gray-300 transition-all duration-300 font-semibold"
             >

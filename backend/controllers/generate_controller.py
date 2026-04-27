@@ -71,7 +71,6 @@ def generate_assets():
             
         slides = ai_output["slides"]
         quiz = ai_output["quiz"]
-        video_slides = slides[:MAX_VIDEO_SLIDES]
 
         # 2. Generate slides
         print("Generating slides...")
@@ -82,16 +81,14 @@ def generate_assets():
         print("Generating voiceovers...")
         voice_paths = []
         durations = []
-        for i, s in enumerate(video_slides):
+        for i, s in enumerate(slides):
             slide_script = s["script"]
             voice_path = f"output/voiceover_{i}.mp3"
             generate_voiceover(slide_script, voice_path)
             voice_paths.append(voice_path)
-            # Get duration of each voiceover
             duration = get_media_duration(voice_path)
-            # Cap duration at 15 seconds to ensure concise videos
             if duration:
-                capped_duration = min(duration, MAX_SLIDE_SECONDS)
+                capped_duration = min(duration, MAX_SLIDE_SECONDS) if GENERATE_VIDEO else duration
                 durations.append(capped_duration)
             else:
                 durations.append(MAX_SLIDE_SECONDS)
@@ -148,6 +145,7 @@ def generate_assets():
             "video_path": video_path,
             "video_local_path": video_local_path if 'video_local_path' in locals() else video_path,
             "slide_images": slide_images_cloud,
+            "slide_durations": durations,
             "quiz": quiz_data
         }
 
@@ -165,6 +163,7 @@ def generate_assets():
                 "video_local_path": video_local_path if 'video_local_path' in locals() else video_path,
                 "video_url": video_path,
                 "slide_images": slide_images_cloud,
+                "slide_durations": durations,
             },
         })
         result["lecture_id"] = lecture_record["id"]
