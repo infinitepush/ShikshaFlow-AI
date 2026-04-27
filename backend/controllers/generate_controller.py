@@ -1,12 +1,13 @@
 from flask import request, jsonify
-from services.ai_service import generate_lecture
+from services.ai_service import AIQuotaError, generate_lecture
 from services.slide_service import generate_slides
 from services.voice_service import generate_voiceover, combine_audio
 from services.video_service import create_video, get_media_duration
 from services.quiz_service import generate_quiz
+from services.cloud_service import upload_file
+from services.database_service import save_lecture_record
 from utils.file_utils import convert_pptx_to_images
 import json
-import os
 
 def generate_assets():
     try:
@@ -26,6 +27,7 @@ def generate_assets():
             
         prompt = data.get("prompt")
         theme = data.get("theme", "Minimalist")
+        user_email = data.get("user_email")
         print(f"Prompt: {prompt}, Theme: {theme}")
 
         if not prompt:
@@ -97,6 +99,12 @@ def generate_assets():
         combine_audio(voice_paths, full_voice_path)
         print(f"Combined voice path: {full_voice_path}")
 
+        slides_upload = upload_file(slides_path, resource_type="raw")
+        slides_url = slides_upload["secure_url"] if slides_upload else slides_path
+
+        voice_upload = upload_file(full_voice_path, resource_type="video")
+        voice_url = voice_upload["secure_url"] if voice_upload else full_voice_path
+
         # 4. Convert slides to images for video creation
         print("Converting slides to images...")
         slide_images_result = convert_pptx_to_images(slides_path)
@@ -124,18 +132,46 @@ def generate_assets():
 
         # 7. Return final result
         result = {
+            "lecture_id": None,
+            "user_email": user_email,
+            "prompt": prompt,
+            "theme": theme,
             "slides_path": slides_path,
+            "slides_url": slides_url,
             "voice_path": full_voice_path,
+            "voice_url": voice_url,
             "video_path": video_path,
             "video_local_path": video_local_path if 'video_local_path' in locals() else video_path,
             "slide_images": slide_images_cloud,
             "quiz": quiz_data
         }
+
+        lecture_record = save_lecture_record({
+            "user_email": user_email,
+            "prompt": prompt,
+            "theme": theme,
+            "slides": slides,
+            "quiz": quiz_data,
+            "assets": {
+                "slides_local_path": slides_path,
+                "slides_url": slides_url,
+                "voice_local_path": full_voice_path,
+                "voice_url": voice_url,
+                "video_local_path": video_local_path if 'video_local_path' in locals() else video_path,
+                "video_url": video_path,
+                "slide_images": slide_images_cloud,
+            },
+        })
+        result["lecture_id"] = lecture_record["id"]
+
         print(f"Returning result: {result}")
         return jsonify(result)
     except json.JSONDecodeError as e:
         print(f"JSON decode error: {e}")
         return jsonify({"error": f"Invalid JSON from AI service: {str(e)}"}), 500
+    except AIQuotaError as e:
+        print(f"AI quota error: {e}")
+        return jsonify({"error": str(e)}), 429
     except Exception as e:
         print(f"Error in generate_assets: {e}")
         import traceback

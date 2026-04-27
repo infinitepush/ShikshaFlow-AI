@@ -1,15 +1,24 @@
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
-import os
+from config.config import (
+    CLOUDINARY_API_KEY,
+    CLOUDINARY_API_SECRET,
+    CLOUDINARY_CLOUD_NAME,
+)
 
-# Configure Cloudinary with provided credentials
 cloudinary.config(
-    cloud_name="darxayoxh",
-    api_key="361159848575877",
-    api_secret="o8yxsgWi3M0-7eleAiScnvCUIvQ",
+    cloud_name=CLOUDINARY_CLOUD_NAME,
+    api_key=CLOUDINARY_API_KEY,
+    api_secret=CLOUDINARY_API_SECRET,
     secure=True
 )
+
+cloudinary_available = all([
+    CLOUDINARY_CLOUD_NAME,
+    CLOUDINARY_API_KEY,
+    CLOUDINARY_API_SECRET,
+])
 
 def upload_file(file_path, resource_type="auto", public_id=None):
     """
@@ -23,6 +32,10 @@ def upload_file(file_path, resource_type="auto", public_id=None):
     Returns:
         dict: Upload result containing URL and other metadata, or None if failed
     """
+    if not cloudinary_available:
+        print("Cloudinary is not configured; skipping upload.")
+        return None
+
     try:
         # Upload file to Cloudinary
         result = cloudinary.uploader.upload(
@@ -48,6 +61,10 @@ def get_file_url(public_id, resource_type="auto"):
     Returns:
         str: URL of the file
     """
+    if not cloudinary_available:
+        print("Cloudinary is not configured; cannot create URL.")
+        return None
+
     try:
         url = cloudinary.utils.cloudinary_url(public_id, resource_type=resource_type)[0]
         return url

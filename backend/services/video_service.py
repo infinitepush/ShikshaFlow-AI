@@ -1,6 +1,4 @@
 import os
-import time
-import moviepy
 from moviepy import ImageClip, concatenate_videoclips, AudioFileClip, VideoFileClip
 
 def create_video(slide_images, audio_path, durations=None):
@@ -152,10 +150,10 @@ def get_media_duration(file_path):
             print(f"File not found: {file_path}")
             return None
             
-        # Use MoviePy to get duration
-        clip = VideoFileClip(file_path)
+        _, extension = os.path.splitext(file_path.lower())
+        clip = AudioFileClip(file_path) if extension in [".mp3", ".wav", ".m4a", ".aac"] else VideoFileClip(file_path)
         duration = clip.duration
-        clip.close()  # Important to close the clip to free resources
+        clip.close()
         return duration
     except Exception as e:
         print(f"Error getting media duration: {e}")

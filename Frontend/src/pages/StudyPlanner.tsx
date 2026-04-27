@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
+import { apiUrl } from '../utils/api';
 
 const StudyPlanner = () => {
   const [subjects, setSubjects] = useState('');
@@ -17,7 +18,7 @@ const StudyPlanner = () => {
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:5000/generate-study-plan', {
+      const response = await fetch(apiUrl('/generate-study-plan'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

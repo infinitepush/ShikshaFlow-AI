@@ -1,5 +1,6 @@
 from gtts import gTTS
 import os
+from moviepy import AudioFileClip, concatenate_audioclips
 
 def generate_voiceover(script_text, path):
     try:
@@ -20,20 +21,21 @@ def generate_voiceover(script_text, path):
 def combine_audio(audio_paths, output_path):
     """
     Combine multiple audio files into one.
-    Simple concatenation approach for MP3 files.
     """
     if not audio_paths:
         raise ValueError("No audio paths provided")
-    
-    with open(output_path, 'wb') as output_file:
-        for i, path in enumerate(audio_paths):
-            if not os.path.exists(path):
-                raise FileNotFoundError(f"Audio file not found: {path}")
-            
-            with open(path, 'rb') as input_file:
-                data = input_file.read()
-                # For MP3 files, we can simply concatenate them
-                # This works for files with the same encoding and sample rate
-                output_file.write(data)
-    
-    return output_path
+
+    clips = []
+    for path in audio_paths:
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Audio file not found: {path}")
+        clips.append(AudioFileClip(path))
+
+    try:
+        combined = concatenate_audioclips(clips)
+        combined.write_audiofile(output_path, logger=None)
+        combined.close()
+        return output_path
+    finally:
+        for clip in clips:
+            clip.close()

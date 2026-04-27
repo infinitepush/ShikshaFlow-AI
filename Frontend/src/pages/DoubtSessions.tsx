@@ -1,19 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { MessageSquare, Send, Plus } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 
 interface Message {
-  id: number;
+  id: string;
   sender: 'user' | 'mentor';
   text: string;
   timestamp: string;
 }
 
 interface Session {
-  id: number;
+  id: string;
   title: string;
-  lastMessage: string;
+  last_message: string;
   timestamp: string;
+  updated_at: string;
   messages: Message[];
 }
 
@@ -21,17 +24,43 @@ const DoubtSessions = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [inputText, setInputText] = useState('');
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { user, token } = useAuth();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(() => {
-    if (sessions.length > 0 && !activeSession) {
-      setActiveSession(sessions[0]);
-    }
-  }, [sessions, activeSession]);
+    const loadSessions = async () => {
+      setLoadingSessions(true);
+      setError('');
+
+      try {
+        const query = user?.email ? `?user_email=${encodeURIComponent(user.email)}` : '';
+        const response = await fetch(apiUrl(`/doubt-sessions${query}`), {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data?.error || 'Failed to load doubt sessions');
+        }
+
+        setSessions(data.sessions || []);
+        setActiveSession(data.sessions?.[0] || null);
+      } catch (err: any) {
+        setError(err.message || 'Failed to load doubt sessions');
+      } finally {
+        setLoadingSessions(false);
+      }
+    };
+
+    loadSessions();
+  }, [user?.email]);
 
   useEffect(() => {
     if (activeSession) {
@@ -39,64 +68,84 @@ const DoubtSessions = () => {
     }
   }, [activeSession?.messages]);
 
-  const handleSend = () => {
-    if (!inputText.trim() || !activeSession) return;
-
-    const newMessage: Message = {
-      id: activeSession.messages.length + 1,
-      sender: 'user',
-      text: inputText,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-
-    const updatedMessages = [...activeSession.messages, newMessage];
-    const updatedSession = {
-      ...activeSession,
-      messages: updatedMessages,
-      lastMessage: inputText,
-      timestamp: new Date().toISOString(),
-    };
-
+  const updateSessionState = (updatedSession: Session) => {
     setActiveSession(updatedSession);
-    setSessions(sessions.map((s) => (s.id === activeSession.id ? updatedSession : s)));
-    setInputText('');
-
-    setTimeout(() => {
-      const mentorResponse: Message = {
-        id: updatedMessages.length + 1,
-        sender: 'mentor',
-        text: "I'm sorry, I am not able to respond at the moment. Please try again later.",
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-
-      const updatedWithResponse = {
-        ...updatedSession,
-        messages: [...updatedMessages, mentorResponse],
-      };
-
-      setActiveSession(updatedWithResponse);
-      setSessions(sessions.map((s) => (s.id === activeSession.id ? updatedWithResponse : s)));
-    }, 1500);
+    setSessions((currentSessions) =>
+      currentSessions.map((session) => (session.id === updatedSession.id ? updatedSession : session))
+    );
   };
 
-  const handleNewSession = () => {
-    const newSession: Session = {
-      id: Date.now(),
-      title: 'New Doubt Session',
-      lastMessage: 'Session started',
+  const handleSend = async () => {
+    if (!inputText.trim() || !activeSession || sending) return;
+
+    const question = inputText.trim();
+    setInputText('');
+    setError('');
+    setSending(true);
+
+    const newMessage: Message = {
+      id: `${Date.now()}`,
+      sender: 'user',
+      text: question,
       timestamp: new Date().toISOString(),
-      messages: [
-        {
-          id: 1,
-          sender: 'mentor',
-          text: "Hello! I'm here to help. What would you like to learn about today?",
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ],
     };
 
-    setSessions([newSession, ...sessions]);
-    setActiveSession(newSession);
+    updateSessionState({
+      ...activeSession,
+      messages: [...activeSession.messages, newMessage],
+      last_message: question,
+      updated_at: new Date().toISOString(),
+    });
+
+    try {
+      const response = await fetch(apiUrl(`/doubt-sessions/${activeSession.id}/messages`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ question }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to ask doubt');
+      }
+
+      updateSessionState(data.session);
+    } catch (err: any) {
+      setError(err.message || 'Failed to ask doubt');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleNewSession = async () => {
+    setError('');
+
+    try {
+      const response = await fetch(apiUrl('/doubt-sessions'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          title: 'New Doubt Session',
+          user_email: user?.email,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to create session');
+      }
+
+      setSessions((currentSessions) => [data.session, ...currentSessions]);
+      setActiveSession(data.session);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create session');
+    }
   };
 
   if (!activeSession) {
@@ -111,13 +160,17 @@ const DoubtSessions = () => {
           <p className="text-gray-600">Get personalized help with your learning</p>
         </motion.div>
         <div className="flex items-center justify-center h-[calc(100%-5rem)]">
-          <button
-            onClick={handleNewSession}
-            className="px-6 py-3 bg-[#E63946] text-white rounded-xl hover:bg-[#d32f3b] transition-all duration-300 flex items-center justify-center gap-2 mb-4 font-semibold"
-          >
-            <Plus className="w-5 h-5" />
-            Start a New Session
-          </button>
+          <div className="text-center">
+            {loadingSessions && <p className="mb-4 text-gray-600">Loading sessions...</p>}
+            {error && <p className="mb-4 text-sm text-[#E63946]">{error}</p>}
+            <button
+              onClick={handleNewSession}
+              className="px-6 py-3 bg-[#E63946] text-white rounded-xl hover:bg-[#d32f3b] transition-all duration-300 flex items-center justify-center gap-2 mb-4 font-semibold"
+            >
+              <Plus className="w-5 h-5" />
+              Start a New Session
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -162,7 +215,7 @@ const DoubtSessions = () => {
                 <h4 className="font-semibold text-[#1C1C1C] mb-1 truncate">
                   {session.title}
                 </h4>
-                <p className="text-sm text-gray-500 truncate">{session.lastMessage}</p>
+                <p className="text-sm text-gray-500 truncate">{session.last_message}</p>
               </button>
             ))}
           </div>
@@ -186,6 +239,12 @@ const DoubtSessions = () => {
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
             {activeSession.messages.map((message) => (
               <motion.div
                 key={message.id}
@@ -206,11 +265,18 @@ const DoubtSessions = () => {
                       message.sender === 'user' ? 'text-white opacity-70' : 'text-gray-500'
                     }`}
                   >
-                    {message.timestamp}
+                    {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
               </motion.div>
             ))}
+            {sending && (
+              <div className="flex justify-start">
+                <div className="max-w-[70%] rounded-2xl bg-gray-100 px-4 py-3 text-sm text-gray-500">
+                  Shikshak is thinking...
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
@@ -221,11 +287,13 @@ const DoubtSessions = () => {
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                placeholder="Ask your doubt..."
+                placeholder={sending ? 'Shikshak is thinking...' : 'Ask your doubt...'}
+                disabled={sending}
                 className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-[#E63946] focus:outline-none transition-all duration-300"
               />
               <button
                 onClick={handleSend}
+                disabled={sending || !inputText.trim()}
                 className="px-6 py-3 bg-[#E63946] text-white rounded-xl hover:bg-[#d32f3b] transition-all duration-300 shadow-md hover:shadow-lg"
               >
                 <Send className="w-5 h-5" />

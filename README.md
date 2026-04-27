@@ -80,7 +80,7 @@ AI-powered Q&A environment where learners can:
 - Ask topic-specific questions  
 - Get instant, AI-curated explanations  
 - Schedule group or 1-on-1 sessions  
-- Integrate with live chat (OpenAI Assist API or Socket-based interaction)
+- Integrate with live chat (Gemini API or Socket-based interaction)
 
 ---
 
@@ -127,7 +127,7 @@ Phase Two introduces:
 | Layer | Technology |
 |-------|-------------|
 | 💻 Frontend | React + TypeScript + Tailwind + Framer Motion |
-| 🧠 AI Core | OpenAI API (Text, Voice, Image generation) |
+| 🧠 AI Core | Gemini API (Text generation for lectures, plans, quizzes, and chat) |
 | 🧩 Backend | Flask (Python) |
 | 🗂 Media Engine | MoviePy + gTTS + FFmpeg |
 | ☁ Deployment | Render / Vercel |
@@ -154,3 +154,4 @@ Phase Two introduces:
 ```bash
 git clone https://github.com/yourusername/edubuilder-ai.git
 cd edubuilder-ai
+

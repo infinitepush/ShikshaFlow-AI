@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Upload, FileText, Download, Copy, BookText, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { apiUrl } from '../utils/api';
 
 const NotesSummarizer = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -68,9 +69,9 @@ const NotesSummarizer = () => {
       if (file) {
         const formData = new FormData();
         formData.append('file', file);
-        response = await fetch('http://localhost:5000/summarize', { method: 'POST', body: formData });
+        response = await fetch(apiUrl('/summarize'), { method: 'POST', body: formData });
       } else {
-        response = await fetch('http://localhost:5000/summarize', {
+        response = await fetch(apiUrl('/summarize'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ notes_text: textInput }),

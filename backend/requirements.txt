@@ -4,7 +4,7 @@ Flask-Cors>=4.0.1
 gunicorn>=21.0.0
 
 # ==== AI & NLP ====
-openai>=1.0.0
+google-generativeai>=0.8.0
 
 # ==== Presentation Generation ====
 python-pptx>=0.6.0
@@ -12,7 +12,6 @@ Pillow>=9.0.0
 
 # ==== Voice Generation ====
 gTTS>=2.3.0
-pydub>=0.25.0
 
 # ==== Video Creation ====
 moviepy>=1.0.0
@@ -24,12 +23,13 @@ requests>=2.31.0
 numpy>=1.24.0
 tqdm>=4.65.0
 Werkzeug>=3.0.0
+pypdf>=4.0.0
+pymongo>=4.6.0
+certifi>=2024.0.0
+PyJWT>=2.8.0
 
 # ==== Cloud Storage ====
 cloudinary>=1.36.0
-
-# ==== Video Processing ====
-ffmpeg-python>=0.2.0
 
 # ==== Optional (for development/debug) ====
 python-dotenv>=1.0.0
