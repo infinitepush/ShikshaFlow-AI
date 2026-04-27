@@ -15,7 +15,9 @@ const Quizzes = () => {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
 
   useEffect(() => {
-    const storedQuizzes = JSON.parse(localStorage.getItem('edubuilder_quizzes') || '[]');
+    const storedQuizzes = JSON.parse(
+      localStorage.getItem('shiksha_flow_quizzes') || localStorage.getItem('edubuilder_quizzes') || '[]'
+    );
     setQuizzes(storedQuizzes);
   }, []);
 

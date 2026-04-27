@@ -16,8 +16,10 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-const CURRENT_USER_KEY = 'edubuilder_user';
-const AUTH_TOKEN_KEY = 'edubuilder_token';
+const CURRENT_USER_KEY = 'shiksha_flow_user';
+const AUTH_TOKEN_KEY = 'shiksha_flow_token';
+const LEGACY_CURRENT_USER_KEY = 'edubuilder_user';
+const LEGACY_AUTH_TOKEN_KEY = 'edubuilder_token';
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -32,13 +34,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem(CURRENT_USER_KEY);
-    const storedToken = localStorage.getItem(AUTH_TOKEN_KEY);
+    const storedUser = localStorage.getItem(CURRENT_USER_KEY) || localStorage.getItem(LEGACY_CURRENT_USER_KEY);
+    const storedToken = localStorage.getItem(AUTH_TOKEN_KEY) || localStorage.getItem(LEGACY_AUTH_TOKEN_KEY);
     if (storedUser) {
       setUser(JSON.parse(storedUser));
+      localStorage.setItem(CURRENT_USER_KEY, storedUser);
+      localStorage.removeItem(LEGACY_CURRENT_USER_KEY);
     }
     if (storedToken) {
       setToken(storedToken);
+      localStorage.setItem(AUTH_TOKEN_KEY, storedToken);
+      localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
     }
   }, []);
 
@@ -83,6 +89,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setToken(null);
     localStorage.removeItem(CURRENT_USER_KEY);
     localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(LEGACY_CURRENT_USER_KEY);
+    localStorage.removeItem(LEGACY_AUTH_TOKEN_KEY);
   };
 
   return (

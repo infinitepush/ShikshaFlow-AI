@@ -1,1 +1,1 @@
-EduBuilderAi
+Shiksha Flow AI

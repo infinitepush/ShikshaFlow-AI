@@ -55,7 +55,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                   <Brain className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="font-bold text-[#1C1C1C]">EduBuilder AI</h2>
+                  <h2 className="font-bold text-[#1C1C1C]">Shiksha Flow AI</h2>
                   <p className="text-xs text-gray-500">{user?.name}</p>
                 </div>
               </div>

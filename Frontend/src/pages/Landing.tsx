@@ -14,7 +14,7 @@ const Landing = () => {
           className="flex items-center gap-2"
         >
           <Brain className="w-8 h-8 text-[#E63946]" />
-          <span className="text-2xl font-bold text-[#1C1C1C]">EduBuilder AI</span>
+          <span className="text-2xl font-bold text-[#1C1C1C]">Shiksha Flow AI</span>
         </motion.div>
         <motion.div
           initial={{ opacity: 0, x: 20 }}
